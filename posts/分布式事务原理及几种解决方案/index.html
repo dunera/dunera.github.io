@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="robots" content="noodp" />
+        <meta http-equiv="X-UA-Compatible" content="IE=edge, chrome=1">
+        <title>分布式事务原理解析及几种解决方案 - dunera</title><meta name="Description" content="嘻嘻嘻嘻嘻嘻1"><meta property="og:title" content="分布式事务原理解析及几种解决方案" />
+<meta property="og:description" content="嘻嘻嘻嘻嘻嘻1" />
+<meta property="og:type" content="article" />
+<meta property="og:url" content="http://example.org/posts/%E5%88%86%E5%B8%83%E5%BC%8F%E4%BA%8B%E5%8A%A1%E5%8E%9F%E7%90%86%E5%8F%8A%E5%87%A0%E7%A7%8D%E8%A7%A3%E5%86%B3%E6%96%B9%E6%A1%88/" />
+<meta property="article:published_time" content="2020-05-19T18:10:56+08:00" />
+<meta property="article:modified_time" content="2020-05-19T18:10:56+08:00" />
+<meta name="twitter:card" content="summary"/>
+<meta name="twitter:title" content="分布式事务原理解析及几种解决方案"/>
+<meta name="twitter:description" content="嘻嘻嘻嘻嘻嘻1"/>
+<meta name="application-name" content="dunera">
+<meta name="apple-mobile-web-app-title" content="dunera"><link rel="shortcut icon" type="image/x-icon" href="/favicon.ico" />
+        <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+        <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png"><link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png"><link rel="manifest" href="/site.webmanifest"><link rel="canonical" href="http://example.org/posts/%E5%88%86%E5%B8%83%E5%BC%8F%E4%BA%8B%E5%8A%A1%E5%8E%9F%E7%90%86%E5%8F%8A%E5%87%A0%E7%A7%8D%E8%A7%A3%E5%86%B3%E6%96%B9%E6%A1%88/" /><link rel="next" href="http://example.org/posts/lru%E7%BC%93%E5%AD%98%E8%AF%A6%E8%A7%A3/" /><link rel="stylesheet" href="/lib/normalize/normalize.min.css"><link rel="stylesheet" href="/css/style.min.css"><link rel="stylesheet" href="/lib/fontawesome-free/all.min.css"><link rel="stylesheet" href="/lib/animate/animate.min.css"><script type="application/ld+json">
+    {
+        "@context": "http://schema.org",
+        "@type": "BlogPosting",
+        "headline": "分布式事务原理解析及几种解决方案",
+        "inLanguage": "zh-CN",
+        "mainEntityOfPage": {
+            "@type": "WebPage",
+            "@id": "http:\/\/example.org\/posts\/%E5%88%86%E5%B8%83%E5%BC%8F%E4%BA%8B%E5%8A%A1%E5%8E%9F%E7%90%86%E5%8F%8A%E5%87%A0%E7%A7%8D%E8%A7%A3%E5%86%B3%E6%96%B9%E6%A1%88\/"
+        },"genre": "posts","keywords": "分布式事务","wordcount":  2912 ,
+        "url": "http:\/\/example.org\/posts\/%E5%88%86%E5%B8%83%E5%BC%8F%E4%BA%8B%E5%8A%A1%E5%8E%9F%E7%90%86%E5%8F%8A%E5%87%A0%E7%A7%8D%E8%A7%A3%E5%86%B3%E6%96%B9%E6%A1%88\/","datePublished": "2020-05-19T18:10:56+08:00","dateModified": "2020-05-19T18:10:56+08:00","author": {
+                "@type": "Person",
+                "name": "lyx"
+            },"description": "嘻嘻嘻嘻嘻嘻1"
+    }
+    </script></head>
+    <body header-desktop="" header-mobile=""><script type="text/javascript">(window.localStorage && localStorage.getItem('theme') ? localStorage.getItem('theme') === 'dark' : ('' === 'auto' ? window.matchMedia('(prefers-color-scheme: dark)').matches : '' === 'dark')) && document.body.setAttribute('theme', 'dark');</script>
+
+        <div id="mask"></div><div class="wrapper"><header class="desktop" id="header-desktop">
+    <div class="header-wrapper">
+        <div class="header-title">
+            <a href="/" title="dunera">dunera</a>
+        </div>
+        <div class="menu">
+            <div class="menu-inner"><a class="menu-item" href="/posts/"> 文章 </a><a class="menu-item" href="/tags/"> 标签 </a><a class="menu-item" href="/categories/"> 分类 </a><a class="menu-item" href="/about/"> 关于 </a><span class="menu-item delimiter"></span><span class="menu-item search" id="search-desktop">
+                        <input type="text" placeholder="搜索文章标题或内容..." id="search-input-desktop">
+                        <a href="javascript:void(0);" class="search-button search-toggle" id="search-toggle-desktop" title="搜索">
+                            <i class="fas fa-search fa-fw"></i>
+                        </a>
+                        <a href="javascript:void(0);" class="search-button search-clear" id="search-clear-desktop" title="清空">
+                            <i class="fas fa-times-circle fa-fw"></i>
+                        </a>
+                        <span class="search-button search-loading" id="search-loading-desktop">
+                            <i class="fas fa-spinner fa-fw fa-spin"></i>
+                        </span>
+                    </span><a href="javascript:void(0);" class="menu-item theme-switch" title="切换主题">
+                    <i class="fas fa-adjust fa-fw"></i>
+                </a>
+            </div>
+        </div>
+    </div>
+</header><header class="mobile" id="header-mobile">
+    <div class="header-container">
+        <div class="header-wrapper">
+            <div class="header-title">
+                <a href="/" title="dunera">dunera</a>
+            </div>
+            <div class="menu-toggle" id="menu-toggle-mobile">
+                <span></span><span></span><span></span>
+            </div>
+        </div>
+        <div class="menu" id="menu-mobile"><div class="search-wrapper">
+                    <div class="search mobile" id="search-mobile">
+                        <input type="text" placeholder="搜索文章标题或内容..." id="search-input-mobile">
+                        <a href="javascript:void(0);" class="search-button search-toggle" id="search-toggle-mobile" title="搜索">
+                            <i class="fas fa-search fa-fw"></i>
+                        </a>
+                        <a href="javascript:void(0);" class="search-button search-clear" id="search-clear-mobile" title="清空">
+                            <i class="fas fa-times-circle fa-fw"></i>
+                        </a>
+                        <span class="search-button search-loading" id="search-loading-mobile">
+                            <i class="fas fa-spinner fa-fw fa-spin"></i>
+                        </span>
+                    </div>
+                    <a href="javascript:void(0);" class="search-cancel" id="search-cancel-mobile">
+                        取消
+                    </a>
+                </div><a class="menu-item" href="/posts/" title="">文章</a><a class="menu-item" href="/tags/" title="">标签</a><a class="menu-item" href="/categories/" title="">分类</a><a class="menu-item" href="/about/" title="">关于</a><a href="javascript:void(0);" class="menu-item theme-switch" title="切换主题">
+                <i class="fas fa-adjust fa-fw"></i>
+            </a></div>
+    </div>
+</header>
+<div class="search-dropdown desktop">
+    <div id="search-dropdown-desktop"></div>
+</div>
+<div class="search-dropdown mobile">
+    <div id="search-dropdown-mobile"></div>
+</div>
+<main class="main">
+                <div class="container"><div class="toc" id="toc-auto">
+            <h2 class="toc-title">目录</h2>
+            <div class="toc-content" id="toc-content-auto"></div>
+        </div><article class="page single"><h1 class="single-title animated flipInX">分布式事务原理解析及几种解决方案</h1><div class="post-meta">
+            <div class="post-meta-line"><span class="post-author"><a href="/" title="Author" rel=" author" class="author"><i class="fas fa-user-circle fa-fw"></i>lyx</a></span>&nbsp;<span class="post-category">收录于 <a href="/categories/%E5%88%86%E5%B8%83%E5%BC%8F/"><i class="far fa-folder fa-fw"></i>分布式</a></span></div>
+            <div class="post-meta-line"><i class="far fa-calendar-alt fa-fw"></i>&nbsp;<time datetime="2020-05-19">2020-05-19</time>&nbsp;<i class="fas fa-pencil-alt fa-fw"></i>&nbsp;约 2912 字&nbsp;
+                <i class="far fa-clock fa-fw"></i>&nbsp;预计阅读 6 分钟&nbsp;</div>
+        </div><div class="details toc" id="toc-static"  kept="">
+                <div class="details-summary toc-title">
+                    <span>目录</span>
+                    <span><i class="details-icon fas fa-angle-right"></i></span>
+                </div>
+                <div class="details-content toc-content" id="toc-content-static"><nav id="TableOfContents">
+  <ul>
+    <li><a href="#一本地事务与事务的特性">一、本地事务与事务的特性</a></li>
+    <li><a href="#二分布式事务">二、分布式事务</a></li>
+    <li><a href="#三分布式事务解决方案">三、分布式事务解决方案</a>
+      <ul>
+        <li><a href="#2pc3pc">2PC/3PC</a></li>
+        <li><a href="#tcc">TCC</a></li>
+        <li><a href="#saga">SAGA</a></li>
+        <li><a href="#事务消息">事务消息</a></li>
+        <li><a href="#可靠消息最终一致性方案">可靠消息最终一致性方案</a></li>
+        <li><a href="#本地消息表">本地消息表</a></li>
+        <li><a href="#最大努力通知">最大努力通知</a></li>
+      </ul>
+    </li>
+  </ul>
+</nav></div>
+            </div><div class="content" id="content"><h2 id="一本地事务与事务的特性">一、本地事务与事务的特性</h2>
+<p>事务的概念对于我们开发来说，不是个陌生的东西，它用来控制一批业务操作一致完成不出错误，一个经典的例子就是银行转账，比如 A 要给 B 转100块钱，在整个转账过程里，涉及到以下几个步骤：</p>
+<ol>
+<li>查询A账户余额值</li>
+<li>A 账户查出的余额值减100元</li>
+<li>A 账户减去100元的结果写回 A 账户余额字段上</li>
+<li>查询 B 账户余额值</li>
+<li>B 账户查出的余额值增加100元</li>
+<li>B 账户增加100元的结果写入 B 账户余额字段上</li>
+</ol>
+<div class="highlight"><pre class="chroma"><code class="language-java" data-lang="java"><span class="kd">public</span> <span class="kt">void</span> <span class="nf">transfer</span><span class="o">(</span><span class="n">BigDecimal</span> <span class="n">money</span><span class="o">,</span> <span class="n">User</span> <span class="n">from_A</span> <span class="o">,</span><span class="n">User</span> <span class="n">to_B</span><span class="o">){</span>
+    <span class="n">BigDecimal</span> <span class="n">balanceOfA</span> <span class="o">=</span> <span class="n">getBalanceFromAcct</span><span class="o">(</span><span class="n">A</span><span class="o">);</span>
+    <span class="n">BigDecimal</span> <span class="n">remindOfA</span> <span class="o">=</span> <span class="n">balanceOfA</span> <span class="o">-</span> <span class="n">money</span><span class="o">;</span>
+    <span class="n">setBalanceToAcct</span><span class="o">(</span><span class="n">A</span><span class="o">,</span> <span class="n">remindOfA</span><span class="o">);</span>
+    <span class="n">BigDecimal</span> <span class="n">balanceOfB</span> <span class="o">=</span> <span class="n">getBalanceFromAcct</span><span class="o">(</span><span class="n">B</span><span class="o">);</span>
+    <span class="n">BigDecimal</span> <span class="n">remindOfB</span> <span class="o">=</span> <span class="n">balanceOfB</span> <span class="o">+</span> <span class="n">money</span><span class="o">;</span>
+    <span class="n">setBalanceToAcct</span><span class="o">(</span><span class="n">B</span><span class="o">,</span> <span class="n">remindOfB</span><span class="o">);</span>
+<span class="o">}</span>
+</code></pre></div><p>我们都知道事务具有的4个基本属性：<br>
+原子性（<strong>A</strong>tomicity）、一致性（<strong>C</strong>onsistency）、隔离性（<strong>I</strong>solation）、持久性（<strong>D</strong>urability）<br>
+这四个属性通常称为 <strong>ACID</strong> 特性。</p>
+<p>我们平常操作转账，脑海里只会有一个<strong>转钱</strong>的动作的概念，不会想到一个转账操作，背后居然涉及到这么多细化的步骤，这是因为银行把整个转账流程封装到了一个事务中，这几个步骤也必须对外展现得就像只有一个操作一样，一气呵成，要么同时成功，要么同时失败，这就是事务的属性之一：<strong>原子性</strong>的体现。在整个操作中，绝不会发生只扣A的钱，而不增给B钱，也不会只给B账户加钱了，而不在A账户上扣除，转账操作开始前和操作发生后，所有人的账户上的钱总数是不变的。这就是事务的另一个特性的体现：<strong>一致性</strong>。</p>
+<p>事务的<strong>持久性</strong>体现在，事务操作后此次操作对于数据的修改就固定下来。在转账中即A给B的这笔100元转账确定到达B账户中并且归属于B所有了，B可以任意支配这100元进行买买买或者转给C、D、E、F&hellip;</p>
+<p><strong>隔离性</strong>涉及到不同事务间并发操作时互相之间的可见或者是对于共享的数据的访问权限等问题，这里暂时不展开解释。</p>
+<p>如果上述转账操作发生在同一个数据库中，即一个<strong>本地事务</strong>，数据库本身所提供的事务支持就能完全保证操作的正确，而如果A和B的账户是属于不同银行的，我们要操作的账户分属于完全不同的数据库，我们的操作还能保证符合事务的所有条件吗？</p>
+<h2 id="二分布式事务">二、分布式事务</h2>
+<p>随着微服务架构的发展和数据量的日益增大，分布式事务逐渐成为开发过程中不可避免的一个问题，分布式事务产生的场景可以归纳为以下几种：</p>
+<p>跨库场景：
+转账操作需要记录交易流水，数据量大时需要面临分库分表，一比交易的多条流水可能分布在不同的库中（水平拆分）</p>
+<p>跨服务场景：
+例如一个下单主流程，涉及到，扣减库存，新建订单，新增会员积分等服务，
+这几个操作需要确保数据的一致性，扣减库存，订单，新增的会员积分要保持统一。</p>
+<p>混合场景（既跨库又跨服务）</p>
+<p>其实分布式事务归根结底就是针对不同数据库的操作过程中，如何去确保事务的基本ACID属性。</p>
+<p>分布式理论中，一致性分为以下几种类型：弱一致性、强一致性、最终一致性。本地事务保证了数据的强一致性，分布式事务的一些解决方案则是围绕着这几种一致性展开。</p>
+<h2 id="三分布式事务解决方案">三、分布式事务解决方案</h2>
+<h3 id="2pc3pc">2PC/3PC</h3>
+<p><strong>两阶段提交协议</strong>（two phase commit）方案，简称 2PC，是分布式事务的核心协议，2PC 包含两个角色，协调者（Coornidator）和参与者（Cohort）还有两个主要阶段：<br>
+1、准备阶段（prepare）<br>
+协调者向参与者询问是否可以共同提交，获取全部参与者的的准备结果响应，然后进入提交阶段。</p>
+<!-- raw HTML omitted -->
+<p>2、提交阶段（commit）<br>
+协调者根据准备阶段获取的所有参与者的准备信息向所有的参与者发布<strong>共同提交</strong>或者<strong>共同回滚</strong>的指令，用以保证事务达到一致性。</p>
+<!-- raw HTML omitted -->
+<ul>
+<li>2PC 优势：该协议能保证各个参与全局事务的节点的数据强一致性。</li>
+<li>2PC 存在问题：
+<ul>
+<li>单点故障：协调者是整个流程的核心，如果协调者在提交阶段挂了，那么所有参与者就接受不到下一步操作的指令，进退两难，只能一直阻塞，影响很大。</li>
+<li>数据问题：提交阶段，如果因为网络问题，只有部分参与者接收到了提交命令，那么会造成节点间数据不一致问题。</li>
+<li>性能问题：参与者需要阻塞等待其他参与者响应接受指令，性能影响较大。</li>
+</ul>
+</li>
+</ul>
+<p><strong>三阶段提交协议</strong>（three phase commit）方案，简称 3PC，是基于 2PC 协议的基础上的改进版本，为了解决 2PC 在提交阶段（commit）可能由于网络不通造成的数据不一致问题，在 2PC 的基础上，增加了preCommit阶段，使得在参与者在收不到确认时依然可以提交或者回退。</p>
+<!-- raw HTML omitted -->
+<h3 id="tcc">TCC</h3>
+<p>TCC(Try-Confirm-Cancel)是一种补偿型的事务模型，分为尝试（Try）、确认（Confirm）、取消（Cancel）三个阶段。
+Try阶段：检测资源并对资源进行锁定或者预留。
+Confirm阶段：执行事务。
+Cancel阶段：释放资源或者如果发生异常在此阶段进行补偿或者回滚。</p>
+<ul>
+<li>优点：强一致性保证。</li>
+<li>缺点：需要自己实现补偿的逻辑，实现较复杂。</li>
+</ul>
+<p>实现框架：tx-lcn <a href="https://www.txlcn.org">https://www.txlcn.org</a></p>
+<h3 id="saga">SAGA</h3>
+<p>SAGA 算法于1987年提出，是一种异步的分布式事务解决方案，其理论基础在于，假设所有事件按照顺序推进，总能达到系统的最终一致性，因此 SAGA 需要服务分别定义提交接口以及补偿接口，当某个事务分支失败时，调用其它的分支的补偿接口来进行回滚，SAGA 的具体实现分为两种：Choreography 以及 Orchestration。</p>
+<ul>
+<li>优点：降低了事务粒度，使得事务扩展更加容易，同时采用了异步化方式提升性能。</li>
+<li>缺点：在于很多时候很难定义补偿接口，回滚代价高，而且由于 SAGA 在执行过程中采用了先提交后补偿的思路进行操作，所以单个子事务在并发提交时的隔离性很难保证。</li>
+</ul>
+<p>实现框架：Seata 阿里开源
+<a href="https://github.com/seata/seata/">https://github.com/seata/seata/</a>
+<a href="https://seata.io/zh-cn/">https://seata.io/zh-cn/</a></p>
+<h3 id="事务消息">事务消息</h3>
+<p>事务消息是一种异步确保型事务，将事务分支通过MQ进行异步解耦，本质上是对2PC的另一种形式实现。</p>
+<h3 id="可靠消息最终一致性方案">可靠消息最终一致性方案</h3>
+<p>典型的实现就是RocketMQ对于事务的支持，我们来看下Rocket是如何实现可靠消息的最终一致性：</p>
+<ol>
+<li>事务发起方给MQ发prepare消息。</li>
+<li>事务发起方消息发送成功后执行本地事务。</li>
+<li>通知MQ本地事务的执行结果，如果成功，通知MQ提交，如果失败，通知MQ删除prepare消息，本地事务回滚。</li>
+<li>MQ会自动轮询所有 prepared 消息回调事务发起者的接口询问事务执行状态。避免事务发起者在执行本地事务过程中成功，而在发送确认消息时出现问题。</li>
+<li>MQ的消费端的事务通过MQ自动不断重试来保证，消费端需要保证幂等性。</li>
+</ol>
+<h3 id="本地消息表">本地消息表</h3>
+<p>业务数据表和本地消息表在同一个数据库中，利用本地事务保证写业务数据和本地消息表数据的事务特性，并且使用消息队列来保证了最终一致性。
+本地消息表的处理：</p>
+<ol>
+<li>分布式事务操作的一方A执行业务操作；</li>
+<li>A向本地消息表写入消息，本地事务保证操作1和2的事务；</li>
+<li>将本地消息表中的消息转发到MQ中，转发成功则将消息从本地消息表中删除，否则重试；</li>
+<li>分布式事务操作的另一方B从消息队列中读取一个消息，并写入B所在服务数据库的本地消息表；</li>
+<li>B 系统执行业务操作，如果成功，则更新自己本地消息表的状态以及 A 系统消息表的状态；如果B的本地事务执行失败，则不更新消息表状态。</li>
+<li>A 系统定时扫描自己的消息表，如果有未处理的消息，会再次发送到 MQ 中去，MQ通知 B 再次处理；</li>
+</ol>
+<h3 id="最大努力通知">最大努力通知</h3>
+<p>业务A本地事务执行完之后，发送消息到 MQ；
+一个独立的<strong>最大努力通知服务</strong>会去消费MQ然后写入数据库中记录下来，接着调用业务B的接口；B执行成功，则操作完成；如果系统B执行失败，那么<strong>最大努力通知服务</strong>会定时尝试重新调用系统B进行重试。</p>
+<p>参考链接：</p>
+<ul>
+<li><a href="https://coolshell.cn/articles/10910.html">https://coolshell.cn/articles/10910.html</a></li>
+<li><a href="https://tech.antfin.com/docs/2/69656">https://tech.antfin.com/docs/2/69656</a></li>
+<li><a href="https://www.infoq.cn/article/2018/08/rocketmq-4.3-release">https://www.infoq.cn/article/2018/08/rocketmq-4.3-release</a></li>
+<li><a href="https://github.com/doocs/advanced-java/blob/master/docs/distributed-system/distributed-transaction.md">https://github.com/doocs/advanced-java/blob/master/docs/distributed-system/distributed-transaction.md</a></li>
+</ul>
+</div><div class="post-footer" id="post-footer">
+    <div class="post-info">
+        <div class="post-info-line">
+            <div class="post-info-mod">
+                <span>更新于 2020-05-19</span>
+            </div>
+            <div class="post-info-license"></div>
+        </div>
+        <div class="post-info-line">
+            <div class="post-info-md"></div>
+            <div class="post-info-share">
+                <span></span>
+            </div>
+        </div>
+    </div>
+
+    <div class="post-info-more">
+        <section class="post-tags"><i class="fas fa-tags fa-fw"></i>&nbsp;<a href="/tags/%E5%88%86%E5%B8%83%E5%BC%8F%E4%BA%8B%E5%8A%A1/">分布式事务</a></section>
+        <section>
+            <span><a href="javascript:void(0);" onclick="window.history.back();">返回</a></span>&nbsp;|&nbsp;<span><a href="/">主页</a></span>
+        </section>
+    </div>
+
+    <div class="post-nav">
+            <a href="/posts/lru%E7%BC%93%E5%AD%98%E8%AF%A6%E8%A7%A3/" class="next" rel="next" title="LRU缓存详解">LRU缓存详解<i class="fas fa-angle-right fa-fw"></i></a></div>
+</div>
+<div id="comments"></div></article></div>
+            </main><footer class="footer">
+        <div class="footer-container"><div class="footer-line">由 <a href="https://gohugo.io/" target="_blank" rel="noopener noreffer" title="Hugo 0.71.0-DEV">Hugo</a> 强力驱动 | 主题 - <a href="https://github.com/dillonzq/LoveIt" target="_blank" rel="noopener noreffer" title="LoveIt 0.2.9"><i class="far fa-kiss-wink-heart fa-fw"></i> LoveIt</a>
+                </div><div class="footer-line"><i class="far fa-copyright fa-fw"></i><span itemprop="copyrightYear">2020</span><span class="author" itemprop="copyrightHolder">&nbsp;<a href="/" target="_blank"></a></span></div>
+        </div>
+    </footer></div>
+
+        <div id="fixed-buttons"><a href="#" id="back-to-top" class="fixed-button" title="回到顶部">
+                <i class="fas fa-arrow-up fa-fw"></i>
+            </a><a href="#" id="view-comments" class="fixed-button" title="查看评论">
+                <i class="fas fa-comment fa-fw"></i>
+            </a>
+        </div><link rel="stylesheet" href="/lib/katex/katex.min.css"><script type="text/javascript" src="/lib/smooth-scroll/smooth-scroll.min.js"></script><script type="text/javascript" src="/lib/autocomplete/autocomplete.min.js"></script><script type="text/javascript" src="/lib/lunr/lunr.min.js"></script><script type="text/javascript" src="/lib/lunr/lunr.stemmer.support.min.js"></script><script type="text/javascript" src="/lib/lunr/lunr.zh.min.js"></script><script type="text/javascript" src="/lib/lazysizes/lazysizes.min.js"></script><script type="text/javascript" src="/lib/clipboard/clipboard.min.js"></script><script type="text/javascript" src="/lib/sharer/sharer.min.js"></script><script type="text/javascript" src="/lib/katex/katex.min.js"></script><script type="text/javascript" src="/lib/katex/auto-render.min.js"></script><script type="text/javascript">window.config={"code":{"copyTitle":"复制到剪贴板","maxShownLines":10},"comment":{},"math":{"delimiters":[{"display":true,"left":"$$","right":"$$"},{"display":true,"left":"\\[","right":"\\]"},{"display":false,"left":"$","right":"$"},{"display":false,"left":"\\(","right":"\\)"}],"strict":false},"search":{"highlightTag":"em","lunrLanguageCode":"zh","lunrSegmentitURL":"/lib/lunr/lunr.segmentit.js","maxResultLength":10,"noResultsFound":"没有找到结果","snippetLength":50}};</script><script type="text/javascript" src="/js/theme.min.js"></script></body>
+</html>
